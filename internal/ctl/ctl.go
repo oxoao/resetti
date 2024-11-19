@@ -21,6 +21,12 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Boateye logic
+const BoateyeRes = 2 //boateye altRes index
+const boatOnCmd = "./boat_on.sh"
+const boatOffCmd = "./boat_off.sh"
+var boateyeEnabled = false
+
 // Hook types
 const (
 	HookReset int = iota
@@ -171,13 +177,35 @@ func (c *Controller) FocusInstance() {
 	c.manager.Focus()
 }
 
+// Boateye hook
+func ToggleBoateye(enable bool) {
+	var path string
+	if (enable) {
+		path = boatOnCmd
+	} else {
+		path = boatOffCmd
+	}
+	cmd := exec.Command("bash", "-c", path)
+	err := cmd.Run()
+	if err != nil {
+		log.Error("Boateye ExecCommand failed")
+	}
+	boateyeEnabled = enable;
+}
+
 // ToggleResolution switches the given instance between the normal (play)
 // resolution and the given alternate resolution.
 func (c *Controller) ToggleResolution(resId int) {
 	if c.manager.ToggleResolution(resId) {
 		c.RunHook(HookAltRes, resId)
+		if (resId == BoateyeRes) {
+			ToggleBoateye(true)
+		}
 	} else {
 		c.RunHook(HookNormalRes, resId)
+		if (boateyeEnabled) {
+			ToggleBoateye(false);
+		}
 	}
 }
 
@@ -188,9 +216,9 @@ func (c *Controller) ResetInstance() bool {
 }
 
 // RunHook runs the hook of the given type if it exists.
-func (c *Controller) RunHook(hook int, hookId int) {
+func (c *Controller) RunHook(hook int, hookId int) {	
 	if hookId >= len(c.hooks[hook]) {
-		log.Error("RunHook: hook id %d out of bounds", hookId)
+		// log.Error("RunHook: hook id %d out of bounds", hookId)
 		return
 	}
 	cmdStr := c.hooks[hook][hookId]
@@ -258,6 +286,15 @@ func (i *inputManager) Run(inputs chan<- Input) {
 			}
 		}
 
+		// Avoid f3 conflict
+		// TODO: add proper config for key conflicts
+		var f3mask [32]byte
+		f3key := 69
+		f3mask[f3key/8] |= (1 << (f3key % 8))
+		if keymap.HasPressed(f3mask) {
+			continue
+		}
+		
 		// PERF: This is kind of bad and can probably be optimized
 		var pressed []cfg.Bind
 		for bind := range i.conf.Keybinds {
