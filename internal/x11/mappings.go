@@ -202,6 +202,7 @@ var KeycodesMc = map[string]xproto.Keycode{
 	"pause":           127,
 	"menu":            135,
 	"print.screen":    107,
+	"page.down":       117,
 }
 
 // Keycodes is a list of modifier keycodes used for config parsing.
